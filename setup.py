@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -99,6 +100,20 @@ kimodo_packages = find_packages(include=["kimodo", "kimodo.*"])
 # When set (e.g. in Docker), do not bundle motion_correction here; it is installed
 # separately (e.g. from docker_requirements.txt as ./MotionCorrection) non-editable.
 skip_motion_correction = os.environ.get("SKIP_MOTION_CORRECTION_IN_SETUP", "").strip().lower() in ("1", "true", "yes")
+
+# The motion_correction native extension is built on x86 SSE/AVX intrinsics and has no
+# arm64/NEON path, so it cannot compile on non-x86 targets (e.g. Apple Silicon). Skip it
+# there by default; kimodo falls back to the pure-Python postprocessing path. Set
+# FORCE_MOTION_CORRECTION_BUILD=1 to attempt the build anyway (e.g. after porting to NEON).
+_machine = platform.machine().lower()
+_is_x86 = _machine in ("x86_64", "amd64", "i386", "i486", "i586", "i686")
+_force_motion_correction = os.environ.get("FORCE_MOTION_CORRECTION_BUILD", "").strip().lower() in ("1", "true", "yes")
+if not skip_motion_correction and not _is_x86 and not _force_motion_correction:
+    print(
+        f"Skipping motion_correction native extension: architecture '{platform.machine()}' is not x86 "
+        "(the C++ SIMD code is SSE/AVX-only). Set FORCE_MOTION_CORRECTION_BUILD=1 to override."
+    )
+    skip_motion_correction = True
 
 if skip_motion_correction:
     packages = kimodo_packages

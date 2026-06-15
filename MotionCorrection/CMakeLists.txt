@@ -70,13 +70,27 @@ endif()
 target_compile_definitions(motion_correction_cpp_base PUBLIC EIGEN_MPL2_ONLY)
 
 # Compiler-specific settings
+# SSE4.1/AVX are x86-only instruction sets; only enable them on x86 targets.
+# On arm64 (e.g. Apple Silicon) Eigen falls back to NEON automatically.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i.86")
+    set(MOTION_CORRECTION_IS_X86 ON)
+else()
+    set(MOTION_CORRECTION_IS_X86 OFF)
+endif()
+
 if(MSVC)
     # MSVC-specific flags
-    target_compile_options(motion_correction_cpp_base PRIVATE /W4 /arch:AVX)
+    target_compile_options(motion_correction_cpp_base PRIVATE /W4)
+    if(MOTION_CORRECTION_IS_X86)
+        target_compile_options(motion_correction_cpp_base PRIVATE /arch:AVX)
+    endif()
 else()
     # GCC/Clang flags (also applies to MinGW on Windows)
-    # Enable SSE4.1 and AVX instructions for SIMD operations
-    target_compile_options(motion_correction_cpp_base PRIVATE -Wall -Wextra -msse4.1 -mavx)
+    target_compile_options(motion_correction_cpp_base PRIVATE -Wall -Wextra)
+    # Enable SSE4.1 and AVX instructions for SIMD operations (x86 only)
+    if(MOTION_CORRECTION_IS_X86)
+        target_compile_options(motion_correction_cpp_base PRIVATE -msse4.1 -mavx)
+    endif()
 endif()
 
 # Python bindings
