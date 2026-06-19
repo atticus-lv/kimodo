@@ -7,6 +7,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find Python
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
+# Find SIMDe for translating x86 intrinsics on arm64/aarch64.
+find_path(SIMDE_INCLUDE_DIR
+    NAMES simde/x86/sse.h
+    HINTS
+        ENV SIMDE_INCLUDE_DIR
+        ENV CONDA_PREFIX
+        /opt/homebrew/include
+        /usr/local/include
+        /opt/local/include
+    PATH_SUFFIXES include
+)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
+    if(NOT SIMDE_INCLUDE_DIR)
+        message(FATAL_ERROR "SIMDe headers not found. Install simde or set CMAKE_PREFIX_PATH.")
+    endif()
+endif()
+
 # Find or fetch pybind11
 find_package(pybind11 CONFIG QUIET)
 if(NOT pybind11_FOUND)
@@ -21,7 +39,7 @@ if(NOT pybind11_FOUND)
 endif()
 
 # Find or fetch Eigen
-find_package(Eigen3 3.3 CONFIG QUIET)
+find_package(Eigen3 CONFIG QUIET)
 if(NOT Eigen3_FOUND)
     message(STATUS "Eigen3 not found, fetching from GitLab...")
     include(FetchContent)
@@ -60,6 +78,10 @@ set_target_properties(motion_correction_cpp_base PROPERTIES POSITION_INDEPENDENT
 target_include_directories(motion_correction_cpp_base PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp
 )
+
+if(SIMDE_INCLUDE_DIR)
+    target_include_directories(motion_correction_cpp_base PUBLIC ${SIMDE_INCLUDE_DIR})
+endif()
 
 if(TARGET Eigen3::Eigen)
     target_link_libraries(motion_correction_cpp_base PUBLIC Eigen3::Eigen)
